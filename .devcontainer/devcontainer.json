@@ -1,0 +1,27 @@
+{
+    "name": "Python CDK Environment",
+    "build": { 
+        "dockerfile": "Dockerfile",
+        "context": "."
+    }, 
+    "forwardPorts": [],
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.selectInterpreter": "/usr/local/bin/python"
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "sourcegraph.cody-ai",
+                "ms-vscode.makefile-tools"
+            ]
+        }
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.aws,target=/root/.aws,type=bind,consistency=cached"
+    ],
+    "remoteUser": "root"
+}
+
