@@ -19,7 +19,7 @@ class ScheduledContainerStack(Stack):
     def __init__(self, scope: cdk.App, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        vpc = ec2.Vpc.from_lookup( self, id="vpc", vpc_id="vpc-3b95065c")
+        vpc = ec2.Vpc.from_lookup(self, id="vpc", vpc_id="vpc-3b95065c")
 
         selected_subnets = vpc.select_subnets(
             subnet_filters=[
@@ -35,50 +35,27 @@ class ScheduledContainerStack(Stack):
             subnets=selected_subnets.subnets
         )
 
-        my_repository = ecr.Repository(
-            self,
-            "my-repository",
-            repository_name="my-repository",
-        )
-
-        fluentbit_log_group = logs.LogGroup(
-            self,
-            id='fluentbit_log_group',
-            log_group_name="fluentbit_log_group",
-            retention=logs.RetentionDays.TWO_WEEKS,
-        )
-
-        self.task_definition = ecs.FargateTaskDefinition(self, "FargateTaskDefinition")
+        task_definition = ecs.FargateTaskDefinition(self, "FargateTaskDefinition")
         
-        self.task_definition.add_container(
+        task_definition.add_container(
             id="scheduled_task", 
             image=ecs.ContainerImage.from_registry("python:3.12"),
-            logging=ecs.FireLensLogDriver(
-                options={
-                    "Name": "loki",
-                    "Url": "https://loki.hostname/loki/api/v1/push",
-                    "Labels": "{job=\"firelens\",env=\"dev\",region=\"us-east-1\"}",
-                    "RemoveKeys": "container_id,ecs_task_arn",
-                    "LabelKeys": "container_name,ecs_task_definition,source,ecs_cluster",
-                    "LineFormat": "key_value"
-                }
-            ),
+            logging=ecs.LogDriver.aws_logs(
+                stream_prefix="scheduled-tasks",
+                log_group=logs.LogGroup(self, "ScheduledTaskLogGroup", log_group_name="my-scheduled-tasks"),
+            )
         )
 
-        self.task_definition.add_to_task_role_policy(
+        task_definition.add_to_task_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "s3:GetObject",
                     "ecs:RunTask",
                 ],
-                resources=[
-                    f'arn:aws:s3:::mybucket',
-                    f'arn:aws:s3:::mybucket/*',
-                ]
-            )
+                resources=["*"])
         )
         
-        self.task_definition.add_to_execution_role_policy(
+        task_definition.add_to_execution_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "ecr:BatchCheckLayerAvailability",
@@ -100,24 +77,12 @@ class ScheduledContainerStack(Stack):
                 ], 
                 resources=["*"])
         )
-    
-        self.task_definition.add_firelens_log_router(
-            id="fluentbit",
-            image=ecs.ContainerImage.from_registry("grafana/fluent-bit-plugin-loki:2.0.0-amd64"),
-            firelens_config=ecs.FirelensConfig(
-                type=ecs.FirelensLogRouterType.FLUENTBIT,
-            ),
-            logging=ecs.LogDriver.aws_logs(
-                stream_prefix="scheduled-tasks",
-                log_group=fluentbit_log_group,
-            ),
-        )
 
-        cluster = ecs.Cluster.from_cluster_attributes(self, "Cluster", vpc=vpc, cluster_name="my-cluster")
+        cluster = ecs.Cluster(self, "MyCluster", vpc=vpc, cluster_name="my-scheduled-tasks")
         
         # see: https://github.com/aws/aws-cdk/issues/26702
         scheduled_fargate_task_definition_options = ecs_patterns.ScheduledFargateTaskDefinitionOptions(
-            task_definition=self.task_definition,
+            task_definition=task_definition,
         )
 
         scheduled_fargate_task = ecs_patterns.ScheduledFargateTask(self, "ScheduledFargateTask",
@@ -126,9 +91,6 @@ class ScheduledContainerStack(Stack):
             subnet_selection = subnet_selection,
             scheduled_fargate_task_definition_options=scheduled_fargate_task_definition_options,
         )
-
-
-
 
 app = cdk.App()
 # set the environment

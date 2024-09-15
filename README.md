@@ -5,9 +5,9 @@ There is an issue described [here](https://github.com/aws/aws-cdk/issues/26702) 
 
 ```python
 # see: https://github.com/aws/aws-cdk/issues/26702
-        scheduled_fargate_task_definition_options = ecs_patterns.ScheduledFargateTaskDefinitionOptions(
-            task_definition=self.task_definition,
-        )
+scheduled_fargate_task_definition_options = ecs_patterns.ScheduledFargateTaskDefinitionOptions(
+    task_definition=self.task_definition,
+)
 ```
 
 # dev container
